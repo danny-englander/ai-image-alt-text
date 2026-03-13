@@ -57,7 +57,12 @@ def write_alt_text(image_path: Path, alt_text: str) -> bool:
     try:
         # -overwrite_original to avoid leaving _original backups in the gallery
         result = subprocess.run(
-            [exiftool, "-overwrite_original", f"-AltTextAccessibility={text}", str(image_path)],
+            [
+                exiftool,
+                "-overwrite_original",
+                f"-AltTextAccessibility={text}",
+                str(image_path),
+            ],
             capture_output=True,
             text=True,
             timeout=15,
@@ -71,7 +76,9 @@ def write_alt_text(image_path: Path, alt_text: str) -> bool:
         return False
 
 
-def generate_alt_text(image_path: Path, model: str, context: Optional[str]) -> Optional[str]:
+def generate_alt_text(
+    image_path: Path, model: str, context: Optional[str]
+) -> Optional[str]:
     """Run caption.py for one image and return the caption for the given model, or None on failure."""
     cmd = [str(CAPTION_SCRIPT), str(image_path), "--model", model]
     if context:
@@ -79,9 +86,13 @@ def generate_alt_text(image_path: Path, model: str, context: Optional[str]) -> O
     env = dict(os.environ)
     env["IMAGE_CAPTION_CONFIG"] = str(SCRIPT_DIR / "models.yaml")
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=SCRIPT_DIR, env=env)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=120, cwd=SCRIPT_DIR, env=env
+        )
         if result.returncode != 0:
-            print(f"  ❌ caption.py error: Command {result.args!r} returned exit status {result.returncode}.")
+            print(
+                f"  ❌ caption.py error: Command {result.args!r} returned exit status {result.returncode}."
+            )
             if result.stderr:
                 print(f"  stderr: {result.stderr.strip()}")
             if result.stdout and not result.stderr:
@@ -111,8 +122,7 @@ def process_directory(
 
     extensions = (".jpg", ".jpeg", ".png", ".gif", ".heic", ".webp")
     image_paths = sorted(
-        p for p in directory.iterdir()
-        if p.is_file() and p.suffix.lower() in extensions
+        p for p in directory.iterdir() if p.is_file() and p.suffix.lower() in extensions
     )
     total = len(image_paths)
     if total == 0:
@@ -144,9 +154,9 @@ def process_directory(
             print(f"  ❌ Caption failed (not written): {alt[:60]}...")
             continue
         if len(alt) > ALT_TEXT_MAX_LEN:
-            alt = alt[:ALT_TEXT_MAX_LEN - 3] + "..."
+            alt = alt[: ALT_TEXT_MAX_LEN - 3] + "..."
             print(f"  ℹ️ Truncated to {ALT_TEXT_MAX_LEN} chars.")
-        print(f"  🟢 {alt[:80]}{'...' if len(alt) > 80 else ''}")
+        print(f"  🟢 📸 🟢  {alt}")
 
         if write_alt_text(image_path, alt):
             print("  ✓ Written to XMP AltTextAccessibility")
