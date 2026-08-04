@@ -1,10 +1,10 @@
-## Installation
+## Overview
 
-This project generates image alt text using an LLM (via the `llm` CLI) and can write it into image files as XMP Alt Text (Accessibility).
+This project generates image alt text using a LLM and writes it into image files as XMP Alt Text for accessibility as the image's `XMP-iptcCore:AltTextAccessibility` key.
 
 These instructions assume macOS or Linux. Windows should work with equivalent tools, but commands may differ.
 
-This code is loosely based on [Dries Buytaert's "Image Caption"](https://github.com/dbuytaert/image-caption). The key difference is in how the generated alt text is stored. Dries' script sends a PATCH request to a remote API, where the alt text is stored server-side and matched to the image by album name and filename. This script instead writes the alt text directly into the image file itself, using `exiftool` to set the `AltTextAccessibility` XMP metadata field, so the alt text is embedded in the image itself.
+Inspired by [Dries Buytaert's "Image Caption"](https://github.com/dbuytaert/image-caption), the key difference being how the generated alt text is stored. Dries' script sends a PATCH request to a remote API, where the alt text is stored server-side and matched to the image by album name and filename. This script instead writes the alt text directly into the image file itself, using `exiftool` to set the `AltTextAccessibility` XMP metadata field, so the alt text is embedded in the image itself.
 
 ---
 
@@ -143,6 +143,7 @@ The primary script in this repo is `update-images.py`, which:
 - Scans a folder of images.
 - Uses `caption.py` + `llm` to generate alt text.
 - Writes the caption into the image’s **XMP Alt Text (Accessibility)** field via `exiftool`.
+- Optionally (`--iptc`) generates Title, Description, and Keywords and overwrites Adobe Bridge **IPTC Core** fields (`Title` / `ObjectName`, `Description` / `Caption-Abstract`, `Keywords` / `Subject`).
 
 ### Supported image formats
 
@@ -185,6 +186,27 @@ To overwrite existing alt text in images:
 
 ```bash
 python update-images.py /path/to/image/folder --force
+```
+
+### IPTC Title, Description, and Keywords (`--iptc`)
+
+By default the script only writes alt text. Pass `--iptc` to also generate and **overwrite** the IPTC fields Adobe Bridge shows under IPTC Core:
+
+- **Title** (and IPTC `ObjectName`) — marketplace-style title aiming for up to 59 characters (under the IPTC 64-char ObjectName limit)
+- **Description** (and IPTC `Caption-Abstract`) — about 3–4 sentences, expanded from the alt text
+- **Keywords** (and XMP `Subject`) — comma-separated tags aiming for ~500 characters; existing keywords are replaced, not appended
+
+```bash
+python update-images.py /path/to/image/folder --iptc
+python update-images.py /path/to/image/folder --iptc --force --context "Linoleum-cut style graphics"
+```
+
+Skip/`--force` still apply only to alt text: images that already have alt text are skipped unless you pass `--force`. When an image is processed with `--iptc`, Title, Description, and Keywords are always overwritten.
+
+To add **only** a Title (leave existing alt, description, and keywords unchanged):
+
+```bash
+python update-images.py /path/to/image/folder --title-only
 ```
 
 ---
@@ -253,8 +275,8 @@ All tests should pass.
 4. Run:
 
    ```bash
-   python update-images.py /path/to/images [--context ...] [--model ...] [--force]
+   python update-images.py /path/to/images [--context ...] [--model ...] [--force] [--iptc]
    ```
 
-   to generate and embed alt text in your images.
+   to generate and embed alt text in your images (and optionally IPTC Title/Description/Keywords).
 

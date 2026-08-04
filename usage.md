@@ -26,6 +26,7 @@ This document describes what each script does, how they differ, and whether they
 - For each image (unless it already has alt text and you don’t use `--force`):
   - Calls **caption.py** (Anthropic/LLM via `llm` + `llm-anthropic`) to generate alt text.
   - Writes the result into the image file’s **XMP Alt Text (Accessibility)** field using **exiftool** (IPTC limit 250 chars).
+  - With **`--iptc`**: runs a second LLM call for a Title (up to 59 chars), 3–4 sentence Description, and ~500-character Keywords, then overwrites IPTC Core `Title`/`ObjectName`, `Description`/`Caption-Abstract`, and `Keywords`/`Subject` (full replace, not append).
 - No remote API and no `AUTH_TOKEN`. Requires:
   - `exiftool` (e.g. `brew install exiftool`)
   - `llm` + `llm-anthropic`, API key via `llm keys set anthropic`
@@ -34,12 +35,14 @@ This document describes what each script does, how they differ, and whether they
 **Typical use**
 
 - Add or refresh accessibility alt text **in the image files themselves** (e.g. for a local photo gallery or static site generator that reads XMP).
+- Optionally refresh Adobe Bridge IPTC Title, Description, and Keywords with `--iptc`.
 
 **Example**
 
 ```bash
 python update-images.py /path/to/image/folder
 python update-images.py /path/to/folder --context "Cherry blossoms at Japanese Friendship Garden" --force
+python update-images.py /path/to/folder --iptc --force
 ```
 
 **Options**
@@ -48,7 +51,8 @@ python update-images.py /path/to/folder --context "Cherry blossoms at Japanese F
 - Optional positional or `-c` / `--context` – short description to improve captions.
 - `--model` – model passed to caption.py (default: `claude-sonnet-4-5`).
 - `--force` – overwrite existing AltTextAccessibility.
-
+- `--iptc` – also generate and overwrite IPTC Title, Description, and Keywords.
+- `--title-only` – only generate and overwrite Title/ObjectName; leave alt, description, and keywords alone.
 ---
 
 ## update-images.py
