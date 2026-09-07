@@ -1,6 +1,7 @@
 llm
 pillow
 ollama
-pyyaml 
+pyyaml
 requests
 python-dotenv
+flask

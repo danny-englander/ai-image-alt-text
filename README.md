@@ -277,7 +277,27 @@ All tests should pass.
 
 ---
 
-## 9. Summary
+## 9. Web interface (optional)
+
+A small Flask app (`webapp.py`) wraps the same pipeline for bulk uploads through a browser
+instead of the CLI:
+
+```bash
+source .venv/bin/activate
+flask --app webapp run
+```
+
+Then open http://127.0.0.1:5000. Upload one or more images, pick a model, optional context,
+mode (alt text only / alt text + IPTC / title only), and whether to overwrite existing alt
+text — the same controls as `update-images.py`'s flags. Progress and results are shown live;
+when done, download a zip of the tagged images (metadata embedded exactly as the CLI would
+write it, since the web app calls the same `image_processor.py` logic in-process).
+
+Notes:
+- Single-user local tool: no auth, in-memory job tracking, one job processed at a time.
+- Uploaded/processed files live in a temp directory per job and aren't cleaned up automatically.
+
+## 10. Summary
 
 1. Install `exiftool`, `llm`, and configure at least one model (Anthropic or local).
 2. Create and activate a Python virtualenv.
