@@ -33,6 +33,8 @@ import time
 from collections import defaultdict
 from tempfile import gettempdir
 
+from replacements import apply_replacements, replacement_prompt_notes
+
 
 def load_models():
     """Load models from models.yaml and check their status."""
@@ -146,11 +148,14 @@ def clean_caption(caption: str) -> str:
 
     # Match "This is an image of..." at the start
     pattern1 = rf"^This is an? ({subjects}) of\s+"
-    first_sentence = re.sub(pattern1, "", first_sentence)
+    first_sentence = re.sub(pattern1, "", first_sentence, flags=re.IGNORECASE)
 
     # Match "This image shows..." or similar at the start
     pattern2 = rf"^(?:This|The)\s*(?:{subjects})\s*(?:{verbs})\s+"
-    first_sentence = re.sub(pattern2, "", first_sentence)
+    first_sentence = re.sub(pattern2, "", first_sentence, flags=re.IGNORECASE)
+
+    # Apply preferred spellings (see replacements.yaml)
+    first_sentence = apply_replacements(first_sentence)
 
     # Final cleanup and capitalize
     first_sentence = first_sentence.strip().strip("\"'")
@@ -252,6 +257,9 @@ def run_llm_command(
         prompt = model_config["prompt"]
         if context:
             prompt = f"Consider this context before analyzing the image: {context}\n\n{prompt}"
+        spelling_notes = replacement_prompt_notes()
+        if spelling_notes:
+            prompt = f"{prompt}\n\n{spelling_notes}"
 
         # Add prompt to command
         cmd.append(prompt)

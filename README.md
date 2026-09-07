@@ -134,6 +134,16 @@ If you create your own config file elsewhere, you can override the default by se
 export IMAGE_CAPTION_CONFIG=/absolute/path/to/your-models.yaml
 ```
 
+### Word replacements (`replacements.yaml`)
+
+`replacements.yaml` is a dictionary of phrases that are always rewritten in generated alt text, titles, descriptions, and keywords. Matching is case-insensitive; capitalization of the source is preserved (`mid-century` → `midcentury`, `Mid-Century` → `Midcentury`).
+
+```yaml
+mid-century: midcentury
+```
+
+Add more `find: replace` lines as needed. The model is also told to use these spellings in the prompt.
+
 ---
 
 ## 6. Basic usage (local XMP alt text workflow)
@@ -227,10 +237,10 @@ python update-images.py /path/to/image/folder --title-only
 
 ### 7.2. Run unit tests
 
-There is at least one test module (`test_caption.py`) exercising caption cleaning:
+There are unit tests for caption cleaning and word replacements:
 
 ```bash
-python -m unittest test_caption.py
+python -m unittest test_caption.py test_replacements.py
 ```
 
 All tests should pass.

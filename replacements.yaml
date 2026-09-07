@@ -1,0 +1,4 @@
+# Phrase substitutions applied to alt text, titles, descriptions, and keywords.
+# Matching is case-insensitive; capitalization of the source is preserved
+# (mid-century → midcentury, Mid-Century → Midcentury).
+mid-century: midcentury

@@ -40,7 +40,11 @@ class TestCleanCaption(unittest.TestCase):
             (
                 "\"The picture shows two cats watching birds\"",
                 "Two cats watching birds."
-            )
+            ),
+            (
+                "A mid-century modern lounge with a low sofa.",
+                "A midcentury modern lounge with a low sofa."
+            ),
         ]
         
         for input_text, expected in test_cases:
