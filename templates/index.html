@@ -6,16 +6,16 @@
   <title>Image Caption</title>
   <style>
     :root {
-      color-scheme: light dark;
-      --bg: #f7f7f8;
-      --panel: #ffffff;
-      --border: #ddd;
-      --text: #1a1a1a;
-      --muted: #666;
-      --accent: #2563eb;
-      --ok: #16a34a;
-      --err: #dc2626;
-      --skip: #a16207;
+      color-scheme: dark;
+      --bg: #16171c;
+      --panel: #1f2128;
+      --border: #34363f;
+      --text: #e6e6ea;
+      --muted: #9599a6;
+      --accent: #4f8cff;
+      --ok: #4ade80;
+      --err: #f87171;
+      --skip: #fbbf24;
     }
     * { box-sizing: border-box; }
     body {
@@ -47,6 +47,21 @@
       color: var(--text);
     }
     input[type="file"] { width: 100%; }
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 1.75rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 0.6rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .drop-zone:hover, .drop-zone:focus-visible { border-color: var(--accent); }
+    .drop-zone.drag-over { border-color: var(--accent); background: rgba(79, 140, 255, 0.08); }
+    .drop-zone p { margin: 0; }
+    .drop-zone .drop-zone-text { color: var(--text); }
+    .drop-zone .drop-zone-count { margin-top: 0.35rem; }
+    .fallback-label { font-weight: 400; color: var(--muted); margin: 0.5rem 0 0.35rem; }
     .radio-row { display: flex; gap: 1.25rem; flex-wrap: wrap; }
     .radio-row label, .checkbox-row label {
       font-weight: 400;
@@ -87,6 +102,11 @@
   <form id="upload-form" class="panel" enctype="multipart/form-data">
     <div class="field">
       <label for="images">Images</label>
+      <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-controls="images">
+        <p class="drop-zone-text">Drag &amp; drop images here, or click to browse</p>
+        <p class="drop-zone-count hint" id="file-count-label"></p>
+      </div>
+      <p class="fallback-label">Or choose files directly:</p>
       <input type="file" id="images" name="images" multiple
              accept=".jpg,.jpeg,.png,.gif,.heic,.webp" required>
     </div>
@@ -136,7 +156,7 @@
     <h2 style="font-size:1.1rem;">Results</h2>
     <table>
       <thead>
-        <tr><th>File</th><th>Status</th><th>Alt text / Title</th><th>Details</th></tr>
+        <tr><th>File</th><th>Status</th></tr>
       </thead>
       <tbody id="results-body"></tbody>
     </table>
@@ -148,7 +168,12 @@
 </main>
 
 <script>
+const ACCEPTED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".heic", ".webp"];
+
 const form = document.getElementById("upload-form");
+const imagesInput = document.getElementById("images");
+const dropZone = document.getElementById("drop-zone");
+const fileCountLabel = document.getElementById("file-count-label");
 const errorBox = document.getElementById("error");
 const submitBtn = document.getElementById("submit-btn");
 const progressPanel = document.getElementById("progress-panel");
@@ -161,6 +186,55 @@ const resetBtn = document.getElementById("reset-btn");
 
 let pollTimer = null;
 
+function isAcceptedFile(file) {
+  const name = file.name.toLowerCase();
+  return ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+function updateFileCount() {
+  const n = imagesInput.files.length;
+  fileCountLabel.textContent = n === 0 ? "" : `${n} file${n === 1 ? "" : "s"} selected`;
+}
+
+function addFiles(fileList) {
+  const accepted = Array.from(fileList).filter(isAcceptedFile);
+  if (accepted.length === 0) return;
+  const merged = new DataTransfer();
+  Array.from(imagesInput.files).forEach((f) => merged.items.add(f));
+  accepted.forEach((f) => merged.items.add(f));
+  imagesInput.files = merged.files;
+  updateFileCount();
+}
+
+imagesInput.addEventListener("change", updateFileCount);
+
+dropZone.addEventListener("click", () => imagesInput.click());
+dropZone.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    imagesInput.click();
+  }
+});
+
+["dragenter", "dragover"].forEach((evt) => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  });
+});
+
+["dragleave", "dragend"].forEach((evt) => {
+  dropZone.addEventListener(evt, () => dropZone.classList.remove("drag-over"));
+});
+
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  if (e.dataTransfer && e.dataTransfer.files.length) {
+    addFiles(e.dataTransfer.files);
+  }
+});
+
 function escapeHtml(s) {
   const div = document.createElement("div");
   div.textContent = s ?? "";
@@ -169,13 +243,9 @@ function escapeHtml(s) {
 
 function renderResults(results) {
   resultsBody.innerHTML = results.map(r => {
-    const headline = r.title || r.alt || "";
-    const details = [r.description, r.keywords].filter(Boolean).join(" | ") || r.message || "";
     return `<tr>
       <td>${escapeHtml(r.filename)}</td>
       <td class="status-${r.status}">${escapeHtml(r.status)}</td>
-      <td>${escapeHtml(headline)}</td>
-      <td>${escapeHtml(details)}</td>
     </tr>`;
   }).join("");
 }
