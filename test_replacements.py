@@ -52,10 +52,37 @@ class TestApplyReplacements(unittest.TestCase):
     def test_empty_mapping_is_noop(self):
         self.assertEqual(apply_replacements("mid-century", {}), "mid-century")
 
+    def test_em_dash_with_spaces_becomes_hyphen(self):
+        self.assertEqual(
+            apply_replacements("Wanderer — Beneath a Burning Sky", {}),
+            "Wanderer - Beneath a Burning Sky",
+        )
+
+    def test_em_dash_without_spaces_becomes_hyphen(self):
+        self.assertEqual(
+            apply_replacements("She paused—then ran.", {}),
+            "She paused-then ran.",
+        )
+
+    def test_em_dash_stripped_along_with_phrase_replacements(self):
+        self.assertEqual(
+            apply_replacements(
+                "A mid-century lounge — low sofa",
+                {"mid-century": "midcentury"},
+            ),
+            "A midcentury lounge - low sofa",
+        )
+
     def test_prompt_notes_include_pairs(self):
         notes = replacement_prompt_notes({"mid-century": "midcentury"})
         self.assertIn("midcentury", notes)
         self.assertIn("mid-century", notes)
+        self.assertIn("em dashes", notes)
+
+    def test_prompt_notes_always_forbid_em_dashes(self):
+        notes = replacement_prompt_notes({})
+        self.assertIn("em dashes", notes)
+        self.assertIn("\u2014", notes)
 
 
 if __name__ == "__main__":

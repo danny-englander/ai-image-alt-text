@@ -45,6 +45,10 @@ class TestCleanCaption(unittest.TestCase):
                 "A mid-century modern lounge with a low sofa.",
                 "A midcentury modern lounge with a low sofa."
             ),
+            (
+                "An astronaut paused — then stepped onto the dune.",
+                "An astronaut paused - then stepped onto the dune."
+            ),
         ]
         
         for input_text, expected in test_cases:

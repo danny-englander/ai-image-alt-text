@@ -144,6 +144,8 @@ mid-century: midcentury
 
 Add more `find: replace` lines as needed. The model is also told to use these spellings in the prompt.
 
+Em dashes (`—`) are always converted to a hyphen (`-`) in every generated field (alt text, title, description, and keywords), whether or not they appear in `replacements.yaml`. The model is also told not to use them.
+
 ---
 
 ## 6. Basic usage (local XMP alt text workflow)

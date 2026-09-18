@@ -11,6 +11,7 @@ import yaml
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_REPLACEMENTS_PATH = SCRIPT_DIR / "replacements.yaml"
+EM_DASH = "\u2014"
 
 
 @lru_cache(maxsize=4)
@@ -47,12 +48,23 @@ def _preserve_case(source: str, replacement: str) -> str:
     return replacement[0].upper() + replacement[1:]
 
 
+def strip_em_dashes(text: str) -> str:
+    """Replace em dashes with a hyphen so they never appear in written fields."""
+    if not text or EM_DASH not in text:
+        return text
+    return text.replace(EM_DASH, "-")
+
+
 def apply_replacements(
     text: str, mapping: Optional[dict[str, str]] = None
 ) -> str:
-    """Replace dictionary phrases in text (case-insensitive, whole-phrase)."""
+    """Replace dictionary phrases in text (case-insensitive, whole-phrase).
+
+    Em dashes are always converted to hyphens, even when the mapping is empty.
+    """
     if not text:
         return text
+    text = strip_em_dashes(text)
     if mapping is None:
         mapping = load_replacements()
     if not mapping:
@@ -73,13 +85,15 @@ def apply_replacements(
 
 def replacement_prompt_notes(mapping: Optional[dict[str, str]] = None) -> str:
     """Short prompt addendum so the model uses preferred spellings up front."""
+    lines = [
+        f'Never use em dashes ({EM_DASH}); use a comma or a hyphen instead.',
+    ]
     if mapping is None:
         mapping = load_replacements()
-    if not mapping:
-        return ""
-    lines = [
-        "Use these preferred spellings (do not use the hyphenated or alternate forms):"
-    ]
-    for find, replace in sorted(mapping.items(), key=lambda kv: kv[0].lower()):
-        lines.append(f'- "{replace}" not "{find}"')
+    if mapping:
+        lines.append(
+            "Use these preferred spellings (do not use the hyphenated or alternate forms):"
+        )
+        for find, replace in sorted(mapping.items(), key=lambda kv: kv[0].lower()):
+            lines.append(f'- "{replace}" not "{find}"')
     return "\n".join(lines) + "\n"
