@@ -49,8 +49,14 @@ class TestApplyReplacements(unittest.TestCase):
             "midcentury modern furniture",
         )
 
-    def test_empty_mapping_is_noop(self):
-        self.assertEqual(apply_replacements("mid-century", {}), "mid-century")
+    def test_empty_mapping_still_rewrites_globals(self):
+        self.assertEqual(apply_replacements("mid-century", {}), "midcentury")
+
+    def test_mid_century_with_spaces(self):
+        self.assertEqual(
+            apply_replacements("a mid century lounge", {}),
+            "a midcentury lounge",
+        )
 
     def test_em_dash_with_spaces_becomes_hyphen(self):
         self.assertEqual(
@@ -74,7 +80,9 @@ class TestApplyReplacements(unittest.TestCase):
         )
 
     def test_prompt_notes_include_pairs(self):
-        notes = replacement_prompt_notes({"mid-century": "midcentury"})
+        notes = replacement_prompt_notes({"mid-century": "midcentury", "colour": "color"})
+        self.assertIn("color", notes)
+        self.assertIn("colour", notes)
         self.assertIn("midcentury", notes)
         self.assertIn("mid-century", notes)
         self.assertIn("em dashes", notes)
@@ -83,6 +91,7 @@ class TestApplyReplacements(unittest.TestCase):
         notes = replacement_prompt_notes({})
         self.assertIn("em dashes", notes)
         self.assertIn("\u2014", notes)
+        self.assertIn("midcentury", notes)
 
 
 if __name__ == "__main__":

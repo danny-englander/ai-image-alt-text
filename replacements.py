@@ -12,6 +12,11 @@ import yaml
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_REPLACEMENTS_PATH = SCRIPT_DIR / "replacements.yaml"
 EM_DASH = "\u2014"
+# Hyphen, space, or dash variants between "mid" and "century".
+MIDCENTURY_RE = re.compile(
+    r"\bmid[\s\-\u2010\u2011\u2013]+century\b",
+    re.IGNORECASE,
+)
 
 
 @lru_cache(maxsize=4)
@@ -55,16 +60,28 @@ def strip_em_dashes(text: str) -> str:
     return text.replace(EM_DASH, "-")
 
 
+def normalize_midcentury(text: str) -> str:
+    """Rewrite mid-century / mid century (any casing) to midcentury."""
+    if not text:
+        return text
+
+    def _sub(match: re.Match) -> str:
+        return _preserve_case(match.group(0), "midcentury")
+
+    return MIDCENTURY_RE.sub(_sub, text)
+
+
 def apply_replacements(
     text: str, mapping: Optional[dict[str, str]] = None
 ) -> str:
     """Replace dictionary phrases in text (case-insensitive, whole-phrase).
 
-    Em dashes are always converted to hyphens, even when the mapping is empty.
+    Em dashes become hyphens, and mid-century becomes midcentury, even when
+    the mapping is empty.
     """
     if not text:
         return text
-    text = strip_em_dashes(text)
+    text = normalize_midcentury(strip_em_dashes(text))
     if mapping is None:
         mapping = load_replacements()
     if not mapping:
@@ -87,13 +104,19 @@ def replacement_prompt_notes(mapping: Optional[dict[str, str]] = None) -> str:
     """Short prompt addendum so the model uses preferred spellings up front."""
     lines = [
         f'Never use em dashes ({EM_DASH}); use a comma or a hyphen instead.',
+        'Always spell it "midcentury", never "mid-century" or "mid century".',
     ]
     if mapping is None:
         mapping = load_replacements()
-    if mapping:
+    extra = [
+        (find, replace)
+        for find, replace in sorted(mapping.items(), key=lambda kv: kv[0].lower())
+        if find.lower() not in {"mid-century", "mid century"}
+    ]
+    if extra:
         lines.append(
             "Use these preferred spellings (do not use the hyphenated or alternate forms):"
         )
-        for find, replace in sorted(mapping.items(), key=lambda kv: kv[0].lower()):
+        for find, replace in extra:
             lines.append(f'- "{replace}" not "{find}"')
     return "\n".join(lines) + "\n"
