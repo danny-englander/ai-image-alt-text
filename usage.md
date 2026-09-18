@@ -26,7 +26,7 @@ This document describes what each script does, how they differ, and whether they
 - For each image (unless it already has alt text and you don’t use `--force`):
   - Calls **caption.py** (Anthropic/LLM via `llm` + `llm-anthropic`) to generate alt text.
   - Writes the result into the image file’s **XMP Alt Text (Accessibility)** field using **exiftool** (IPTC limit 250 chars).
-  - With **`--iptc`**: runs a second LLM call for a Title (up to 59 chars), 3–4 sentence Description, and ~500-character Keywords, then overwrites IPTC Core `Title`/`ObjectName`, `Description`/`Caption-Abstract`, and `Keywords`/`Subject` (full replace, not append).
+  - With **`--iptc`**: runs a second LLM call for a Title (up to 59 chars), Description (3–4 sentences, or a ≤375-character short story with `--creative-description`), and ~500-character Keywords, then overwrites IPTC Core `Title`/`ObjectName`, `Description`/`Caption-Abstract`, and `Keywords`/`Subject` (full replace, not append).
 - No remote API and no `AUTH_TOKEN`. Requires:
   - `exiftool` (e.g. `brew install exiftool`)
   - `llm` + `llm-anthropic`, API key via `llm keys set anthropic`
@@ -53,6 +53,8 @@ python update-images.py /path/to/folder --iptc --force
 - `--force` – overwrite existing AltTextAccessibility.
 - `--iptc` – also generate and overwrite IPTC Title, Description, and Keywords.
 - `--title-only` – only generate and overwrite Title/ObjectName; leave alt, description, and keywords alone.
+- `--creative-title` – with `--iptc` or `--title-only`, generate evocative titles instead of descriptive marketplace-style ones.
+- `--creative-description` – with `--iptc`, write the Description as a creative short story of at most 375 characters.
 ---
 
 ## update-images.py

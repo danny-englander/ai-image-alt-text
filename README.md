@@ -153,7 +153,7 @@ The primary script in this repo is `update-images.py`, which:
 - Scans a folder of images.
 - Uses `caption.py` + `llm` to generate alt text.
 - Writes the caption into the image’s **XMP Alt Text (Accessibility)** field via `exiftool`.
-- Optionally (`--iptc`) generates Title, Description, and Keywords and overwrites Adobe Bridge **IPTC Core** fields (`Title` / `ObjectName`, `Description` / `Caption-Abstract`, `Keywords` / `Subject`).
+- Optionally (`--iptc`) generates Title, Description, and Keywords and overwrites Adobe Bridge **IPTC Core** fields (`Title` / `ObjectName`, `Description` / `Caption-Abstract`, `Keywords` / `Subject`). Title and description each have a default marketplace style and an optional creative style (`--creative-title`, `--creative-description`).
 
 ### Supported image formats
 
@@ -202,8 +202,8 @@ python update-images.py /path/to/image/folder --force
 
 By default the script only writes alt text. Pass `--iptc` to also generate and **overwrite** the IPTC fields Adobe Bridge shows under IPTC Core:
 
-- **Title** (and IPTC `ObjectName`) — marketplace-style title aiming for up to 59 characters (under the IPTC 64-char ObjectName limit)
-- **Description** (and IPTC `Caption-Abstract`) — about 3–4 sentences, expanded from the alt text
+- **Title** (and IPTC `ObjectName`) — up to 59 characters (under the IPTC 64-char ObjectName limit)
+- **Description** (and IPTC `Caption-Abstract`) — 3–4 sentences by default, or a short story with `--creative-description`
 - **Keywords** (and XMP `Subject`) — comma-separated tags aiming for ~500 characters; existing keywords are replaced, not appended
 
 ```bash
@@ -217,6 +217,36 @@ To add **only** a Title (leave existing alt, description, and keywords unchanged
 
 ```bash
 python update-images.py /path/to/image/folder --title-only
+```
+
+### Creative titles (`--creative-title`)
+
+The default title is a literal marketplace-style line, for example:
+
+> Astronaut in Red Spacesuit Under Radiant Desert Sky
+
+Pass `--creative-title` for a more evocative, artistic title instead, for example:
+
+> Wanderer Beneath a Burning Sky
+
+`--creative-title` requires `--iptc` or `--title-only`.
+
+```bash
+python update-images.py /path/to/image/folder --iptc --creative-title
+python update-images.py /path/to/image/folder --title-only --creative-title
+```
+
+### Creative descriptions (`--creative-description`)
+
+The default description is 3–4 literal sentences expanded from the alt text.
+
+Pass `--creative-description` to write the Description as a short-story vignette (mood, incident, or inner life) instead of a catalog of what is visible. Stories are capped at **375 characters**; if the model runs long, the text is trimmed at a sentence boundary when possible.
+
+`--creative-description` requires `--iptc` (title-only does not write a description). It can be combined with `--creative-title`:
+
+```bash
+python update-images.py /path/to/image/folder --iptc --creative-description
+python update-images.py /path/to/image/folder --iptc --creative-title --creative-description
 ```
 
 ---
@@ -237,10 +267,10 @@ python update-images.py /path/to/image/folder --title-only
 
 ### 7.2. Run unit tests
 
-There are unit tests for caption cleaning and word replacements:
+There are unit tests for caption cleaning, word replacements, and title/description style prompts:
 
 ```bash
-python -m unittest test_caption.py test_replacements.py
+python -m unittest test_caption.py test_replacements.py test_image_processor.py
 ```
 
 All tests should pass.
@@ -288,10 +318,16 @@ flask --app webapp run
 ```
 
 Then open http://127.0.0.1:5000. Upload one or more images, pick a model, optional context,
-mode (alt text only / alt text + IPTC / title only), and whether to overwrite existing alt
-text — the same controls as `update-images.py`'s flags. Progress and results are shown live;
-when done, download a zip of the tagged images (metadata embedded exactly as the CLI would
-write it, since the web app calls the same `image_processor.py` logic in-process).
+mode, and whether to overwrite existing alt text — the same controls as `update-images.py`'s
+flags:
+
+- **Alt text only**
+- **Alt text + IPTC** — shows **Creative titles** and **Creative descriptions** checkboxes
+- **Title only** — shows **Creative titles** (descriptions are not written in this mode)
+
+Progress and results are shown live; when done, download a zip of the tagged images
+(metadata embedded exactly as the CLI would write it, since the web app calls the same
+`image_processor.py` logic in-process).
 
 Notes:
 - Single-user local tool: no auth, in-memory job tracking, one job processed at a time.
@@ -305,8 +341,8 @@ Notes:
 4. Run:
 
    ```bash
-   python update-images.py /path/to/images [--context ...] [--model ...] [--force] [--iptc]
+   python update-images.py /path/to/images [--context ...] [--model ...] [--force] [--iptc] [--title-only] [--creative-title] [--creative-description]
    ```
 
-   to generate and embed alt text in your images (and optionally IPTC Title/Description/Keywords).
+   to generate and embed alt text in your images (and optionally IPTC Title/Description/Keywords, including creative title and short-story description styles).
 

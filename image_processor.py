@@ -22,6 +22,8 @@ ALT_TEXT_MAX_LEN = 250
 KEYWORDS_TARGET_LEN = 500
 # IPTC ObjectName max is 64; stay under that so titles don't truncate mid-word.
 TITLE_MAX_LEN = 59
+# Creative short-story descriptions stay well under typical IPTC Caption-Abstract limits.
+DESCRIPTION_STORY_MAX_LEN = 375
 
 DEFAULT_MODEL = "claude-sonnet-4-5"
 DELAY_BETWEEN_REQUESTS = 2  # seconds
@@ -31,12 +33,39 @@ MODELS_CONFIG = SCRIPT_DIR / "models.yaml"
 
 EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".heic", ".webp")
 
+TITLE_INSTRUCTION_DEFAULT = (
+    "a concise marketplace-style title for the artwork. Use as much of {title_len} characters "
+    "as possible without exceeding {title_len}. Prefer subject, place/year if visible in the image, "
+    "and style. Title Case. No Midjourney prompts, job IDs, or file names."
+)
+
+TITLE_INSTRUCTION_CREATIVE = (
+    "an evocative, artistic title for the artwork. Use as much of {title_len} characters as possible "
+    "without exceeding {title_len}. Favor mood, metaphor, and distinctive phrasing over a literal "
+    "catalog of subject and setting (not \"Astronaut in Red Spacesuit Under Radiant Desert Sky\"; "
+    "prefer something like \"Wanderer Beneath a Burning Sky\"). Stay recognizably about this image. "
+    "Title Case. No quotation marks, Midjourney prompts, job IDs, or file names."
+)
+
+DESCRIPTION_INSTRUCTION_DEFAULT = (
+    "3-4 complete sentences expanding on the alt text. Describe subject, setting, style, and notable "
+    "details in clear prose. Do not include Midjourney prompts, job IDs, or technical generation parameters."
+)
+
+DESCRIPTION_INSTRUCTION_CREATIVE = (
+    "a brief, highly creative short-story vignette inspired by the image. Use as much of {desc_len} "
+    "characters as possible without exceeding {desc_len}. Invent a small narrative moment (mood, "
+    "incident, or inner life) rather than a literal catalog of what is visible, while remaining "
+    "recognizably about this image. Complete sentences. Do not wrap the whole story in quotation marks. "
+    "No Midjourney prompts, job IDs, or technical generation parameters."
+)
+
 IPTC_META_PROMPT = """You are helping tag a photograph for Adobe Bridge IPTC Core metadata.
 Given the image and this short alt text: {alt}
 
 Produce ONLY a JSON object (no markdown fences, no other text) with exactly these keys:
-- "title": a concise marketplace-style title for the artwork. Use as much of {title_len} characters as possible without exceeding {title_len}. Prefer subject, place/year if visible in the image, and style. Title Case. No Midjourney prompts, job IDs, or file names.
-- "description": 3-4 complete sentences expanding on the alt text. Describe subject, setting, style, and notable details in clear prose. Do not include Midjourney prompts, job IDs, or technical generation parameters.
+- "title": {title_instruction}
+- "description": {description_instruction}
 - "keywords": a single comma-separated string of relevant search keywords/tags. Aim for approximately {keywords_len} characters total. Prefer concrete nouns, styles, subjects, and themes. No duplicates.
 
 {spelling_notes}{context_block}"""
@@ -45,9 +74,22 @@ TITLE_ONLY_PROMPT = """You are helping tag a photograph for Adobe Bridge IPTC Co
 Look at the image{hint_clause}.
 
 Produce ONLY a JSON object (no markdown fences, no other text) with exactly this key:
-- "title": a concise marketplace-style title for the artwork. Use as much of {title_len} characters as possible without exceeding {title_len}. Prefer subject, place/year if visible in the image, and style. Title Case. No Midjourney prompts, job IDs, or file names.
+- "title": {title_instruction}
 
 {spelling_notes}{context_block}"""
+
+
+def title_instruction(creative: bool = False) -> str:
+    """Title-generation instruction for the default (descriptive) or creative style."""
+    template = TITLE_INSTRUCTION_CREATIVE if creative else TITLE_INSTRUCTION_DEFAULT
+    return template.format(title_len=TITLE_MAX_LEN)
+
+
+def description_instruction(creative: bool = False) -> str:
+    """Description-generation instruction for the default prose or creative short story."""
+    if not creative:
+        return DESCRIPTION_INSTRUCTION_DEFAULT
+    return DESCRIPTION_INSTRUCTION_CREATIVE.format(desc_len=DESCRIPTION_STORY_MAX_LEN)
 
 
 def get_existing_alt_text(image_path: Path) -> Optional[str]:
@@ -132,8 +174,26 @@ def truncate_title(title: str, max_len: int = TITLE_MAX_LEN) -> str:
     return cut.strip()
 
 
+def truncate_description(description: str, max_len: Optional[int] = None) -> str:
+    """Apply replacements, collapse whitespace, and optionally trim at a sentence or word."""
+    text = apply_replacements(re.sub(r"\s+", " ", description.replace("\n", " ")).strip())
+    if max_len is None or len(text) <= max_len:
+        return text
+    cut = text[:max_len].rstrip()
+    sentence_end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    if sentence_end >= max_len // 2:
+        return cut[: sentence_end + 1].strip()
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.strip()
+
+
 def write_iptc_metadata(
-    image_path: Path, title: str, description: str, keywords: str
+    image_path: Path,
+    title: str,
+    description: str,
+    keywords: str,
+    description_max_len: Optional[int] = None,
 ) -> bool:
     """Overwrite Title, ObjectName, Description, Caption-Abstract, Keywords, and Subject via exiftool."""
     exiftool = shutil.which("exiftool")
@@ -141,7 +201,7 @@ def write_iptc_metadata(
         print("❌ exiftool not found. Install with: brew install exiftool")
         return False
     title = truncate_title(title)
-    description = apply_replacements(description.replace("\n", " ").strip())
+    description = truncate_description(description, description_max_len)
     keywords = truncate_keywords(keywords)
     if not title or not description or not keywords:
         return False
@@ -262,6 +322,8 @@ def generate_iptc_metadata(
     model: str,
     alt: str,
     context: Optional[str],
+    creative_title: bool = False,
+    creative_description: bool = False,
 ) -> Optional[tuple[str, str, str]]:
     """Run llm vision call for title + description + keywords.
 
@@ -275,9 +337,11 @@ def generate_iptc_metadata(
     if context:
         context_block = f"Additional context: {context}\n"
 
+    description_max_len = DESCRIPTION_STORY_MAX_LEN if creative_description else None
     prompt = IPTC_META_PROMPT.format(
         alt=alt,
-        title_len=TITLE_MAX_LEN,
+        title_instruction=title_instruction(creative_title),
+        description_instruction=description_instruction(creative_description),
         keywords_len=KEYWORDS_TARGET_LEN,
         spelling_notes=replacement_prompt_notes(),
         context_block=context_block,
@@ -311,7 +375,7 @@ def generate_iptc_metadata(
             return None
         return (
             truncate_title(title),
-            apply_replacements(description),
+            truncate_description(description, description_max_len),
             truncate_keywords(keywords),
         )
     except subprocess.TimeoutExpired:
@@ -323,6 +387,7 @@ def generate_title_only(
     image_path: Path,
     model: str,
     context: Optional[str],
+    creative_title: bool = False,
 ) -> Optional[str]:
     """Run llm vision call for title only. Uses existing Description/alt as hints when present."""
     llm_model = resolve_llm_model_id(model)
@@ -344,7 +409,7 @@ def generate_title_only(
 
     prompt = TITLE_ONLY_PROMPT.format(
         hint_clause=hint_clause,
-        title_len=TITLE_MAX_LEN,
+        title_instruction=title_instruction(creative_title),
         spelling_notes=replacement_prompt_notes(),
         context_block=context_block,
     )
@@ -415,6 +480,8 @@ def process_single_image(
     force: bool = False,
     iptc: bool = False,
     title_only: bool = False,
+    creative_title: bool = False,
+    creative_description: bool = False,
 ) -> dict:
     """Generate and write metadata for one image. Pure logic, no printing.
 
@@ -433,7 +500,7 @@ def process_single_image(
     }
 
     if title_only:
-        title = generate_title_only(image_path, model, context)
+        title = generate_title_only(image_path, model, context, creative_title)
         if not title:
             result["message"] = "Failed to generate title."
             return result
@@ -472,12 +539,17 @@ def process_single_image(
     result["message"] = "Written to XMP AltTextAccessibility"
 
     if iptc:
-        meta = generate_iptc_metadata(image_path, model, alt, context)
+        meta = generate_iptc_metadata(
+            image_path, model, alt, context, creative_title, creative_description
+        )
         if not meta:
             result["message"] += "; failed to generate IPTC title/description/keywords."
             return result
         title, description, keywords = meta
-        if not write_iptc_metadata(image_path, title, description, keywords):
+        description_max_len = DESCRIPTION_STORY_MAX_LEN if creative_description else None
+        if not write_iptc_metadata(
+            image_path, title, description, keywords, description_max_len
+        ):
             result["message"] += "; failed to write IPTC metadata."
             return result
         result["title"] = title

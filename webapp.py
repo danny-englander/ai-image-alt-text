@@ -28,7 +28,16 @@ _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
 
 
-def _run_job(job_id: str, model: str, context: str, force: bool, iptc: bool, title_only: bool) -> None:
+def _run_job(
+    job_id: str,
+    model: str,
+    context: str,
+    force: bool,
+    iptc: bool,
+    title_only: bool,
+    creative_title: bool,
+    creative_description: bool,
+) -> None:
     with _jobs_lock:
         job = _jobs[job_id]
         image_paths = sorted(job["dir"].iterdir())
@@ -36,7 +45,16 @@ def _run_job(job_id: str, model: str, context: str, force: bool, iptc: bool, tit
     for idx, image_path in enumerate(image_paths):
         if idx > 0:
             time.sleep(DELAY_BETWEEN_REQUESTS)
-        result = process_single_image(image_path, model, context, force, iptc, title_only)
+        result = process_single_image(
+            image_path,
+            model,
+            context,
+            force,
+            iptc,
+            title_only,
+            creative_title,
+            creative_description,
+        )
         with _jobs_lock:
             job["results"].append({"filename": image_path.name, **result})
             job["done"] += 1
@@ -73,6 +91,8 @@ def create_job():
     mode = request.form.get("mode", "alt")
     iptc = mode == "iptc"
     title_only = mode == "title_only"
+    creative_title = request.form.get("creative_title") == "on" and (iptc or title_only)
+    creative_description = request.form.get("creative_description") == "on" and iptc
 
     job_id = uuid.uuid4().hex
     job_dir = JOBS_ROOT / job_id
@@ -100,7 +120,9 @@ def create_job():
         }
 
     thread = threading.Thread(
-        target=_run_job, args=(job_id, model, context, force, iptc, title_only), daemon=True
+        target=_run_job,
+        args=(job_id, model, context, force, iptc, title_only, creative_title, creative_description),
+        daemon=True,
     )
     thread.start()
 

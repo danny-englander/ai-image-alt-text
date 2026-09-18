@@ -22,6 +22,8 @@ def process_directory(
     force: bool = False,
     iptc: bool = False,
     title_only: bool = False,
+    creative_title: bool = False,
+    creative_description: bool = False,
 ) -> None:
     """Process all images in directory: generate alt text and write to XMP AltTextAccessibility."""
     if not directory.is_dir():
@@ -44,13 +46,26 @@ def process_directory(
         print("Title only: will overwrite Title/ObjectName; leave alt, description, keywords alone")
     elif iptc:
         print("IPTC: will overwrite Title, Description, and Keywords")
+    if (title_only or iptc) and creative_title:
+        print("Title style: creative (evocative) instead of descriptive marketplace-style")
+    if iptc and creative_description:
+        print("Description style: creative short story (max 375 characters)")
     print()
 
     for idx, image_path in enumerate(image_paths, 1):
         time.sleep(DELAY_BETWEEN_REQUESTS)
         print(f"[{idx}/{total}] {image_path.name}")
 
-        result = process_single_image(image_path, model, context, force, iptc, title_only)
+        result = process_single_image(
+            image_path,
+            model,
+            context,
+            force,
+            iptc,
+            title_only,
+            creative_title,
+            creative_description,
+        )
 
         if result["status"] == "skipped":
             print(f"  💠 Skipped ({result['message']})")
@@ -83,7 +98,7 @@ def process_directory(
                 else result["keywords"]
             )
             print(f"  📌 Title ({len(result['title'])} chars): {result['title']}")
-            print(f"  📝 Description: {preview_desc}")
+            print(f"  📝 Description ({len(result['description'])} chars): {preview_desc}")
             print(f"  🏷️  Keywords ({len(result['keywords'])} chars): {preview_kw}")
             print("  ✓ Written IPTC Title, Description, and Keywords")
 
@@ -131,9 +146,23 @@ def main() -> None:
         action="store_true",
         help="Only generate and overwrite Title/ObjectName; leave alt, description, and keywords unchanged",
     )
+    parser.add_argument(
+        "--creative-title",
+        action="store_true",
+        help="Use evocative, artistic titles instead of descriptive marketplace-style titles (with --iptc or --title-only)",
+    )
+    parser.add_argument(
+        "--creative-description",
+        action="store_true",
+        help="Write the IPTC Description as a creative short story of at most 375 characters (with --iptc)",
+    )
     args = parser.parse_args()
     if args.title_only and args.iptc:
         parser.error("Use either --title-only or --iptc, not both")
+    if args.creative_title and not (args.iptc or args.title_only):
+        parser.error("--creative-title requires --iptc or --title-only")
+    if args.creative_description and not args.iptc:
+        parser.error("--creative-description requires --iptc")
     process_directory(
         args.directory,
         args.model,
@@ -141,6 +170,8 @@ def main() -> None:
         args.force,
         args.iptc,
         args.title_only,
+        args.creative_title,
+        args.creative_description,
     )
 
 
